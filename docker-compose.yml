@@ -12,7 +12,7 @@ services:
     ports:
       - "10000:10000" # Blob Service
       - "10001:10001" # Queue Service
-    command: "azurite-blob --blobHost 0.0.0.0 --azurite-queue --queueHost 0.0.0.0"
+    command: "azurite --skipApiVersionCheck --blobHost 0.0.0.0 --queueHost 0.0.0.0 --blobPort 10000 --queuePort 10001"
 
   # Banco de Dados do Upload Service
   db-upload:

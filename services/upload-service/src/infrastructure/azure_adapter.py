@@ -19,21 +19,19 @@ class AzureAdapter:
         self.queue_client = QueueClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING, QUEUE_NAME)
 
     async def upload_blob(self, filename: str, data: bytes) -> str:
-        async with self.blob_service_client:
-            container_client = self.blob_service_client.get_container_client(CONTAINER_NAME)
-            try:
-                await container_client.create_container()
-            except Exception:
-                pass # Already exists
-            blob_client = container_client.get_blob_client(filename)
-            await blob_client.upload_blob(data, overwrite=True)
-            return blob_client.url
+        container_client = self.blob_service_client.get_container_client(CONTAINER_NAME)
+        try:
+            await container_client.create_container()
+        except Exception:
+            pass # Already exists
+        blob_client = container_client.get_blob_client(filename)
+        await blob_client.upload_blob(data, overwrite=True)
+        return blob_client.url
 
     async def send_to_queue(self, message: dict):
-        async with self.queue_client:
-            try:
-                await self.queue_client.create_queue()
-            except Exception:
-                pass
-            msg_str = json.dumps(message)
-            await self.queue_client.send_message(msg_str)
+        try:
+            await self.queue_client.create_queue()
+        except Exception:
+            pass
+        msg_str = json.dumps(message)
+        await self.queue_client.send_message(msg_str)

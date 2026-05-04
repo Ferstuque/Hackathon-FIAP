@@ -20,25 +20,22 @@ class AzureAdapter:
 
     async def get_blob_content(self, filename: str) -> bytes:
         """Faz o download do arquivo a partir do Blob Storage"""
-        async with self.blob_service_client:
-            blob_client = self.blob_service_client.get_blob_client(container=CONTAINER_NAME, blob=filename)
-            stream = await blob_client.download_blob()
-            return await stream.readall()
+        blob_client = self.blob_service_client.get_blob_client(container=CONTAINER_NAME, blob=filename)
+        stream = await blob_client.download_blob()
+        return await stream.readall()
             
     async def receive_messages(self):
         """Busca imagens a processar na Fila"""
-        async with self.queue_client:
-            # Tolerância para criar fila caso ainda não exista
-            try:
-                await self.queue_client.create_queue()
-            except Exception:
-                pass
+        # Tolerância para criar fila caso ainda não exista
+        try:
+            await self.queue_client.create_queue()
+        except Exception:
+            pass
             
-            messages = self.queue_client.receive_messages(max_messages=1)
-            async for msg in messages:
-                yield msg
+        messages = self.queue_client.receive_messages(max_messages=1)
+        async for msg in messages:
+            yield msg
 
     async def delete_message(self, msg):
         """Remove a mensagem da fila indicando sucesso do processamento"""
-        async with self.queue_client:
-            await self.queue_client.delete_message(msg)
+        await self.queue_client.delete_message(msg)

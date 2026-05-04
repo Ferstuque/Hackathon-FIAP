@@ -18,7 +18,7 @@ async def upload_diagram(file: UploadFile = File(...)):
         response = await client.post(f"{UPLOAD_SERVICE_URL}/internal/upload", files=files)
         
         if response.status_code != 201:
-            raise HTTPException(status_code=response.status_code, detail="Erro no serviço de upload")
+            raise HTTPException(status_code=response.status_code, detail=f"Erro no serviço de upload: {response.text}")
             
         return response.json()
 
