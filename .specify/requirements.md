@@ -16,3 +16,9 @@
 - MVP funcional em 10 dias.
 - Custo Azure: zero ou mínimo (Azurite local; free tiers em cloud).
 - Containerização: Docker + Docker Compose[cite: 1].
+
+## Restrições Técnicas
+- **Linguagem:** Python 3.14+ (Uso obrigatório de Type Hinting moderno).
+- **Framework:** FastAPI (Assíncrono).
+- **Validation:** Pydantic v2.x.
+- **LLM:** Gemini 3.1 Pro Preview - gemini-3.1-pro-preview

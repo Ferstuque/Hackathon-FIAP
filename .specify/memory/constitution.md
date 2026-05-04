@@ -19,35 +19,35 @@ Follow-up TODOs: None.
 ## Core Principles
 
 ### I. Microservices & Clean Architecture
-O sistema MUST ser desenvolvido utilizando arquitetura de microserviços, seguindo rigorosamente as práticas de Clean Architecture. Os limites entre as camadas (Domain, Use Cases, Interfaces/Adapters, Infrastructure) devem ser protegidos e restritos em cada serviço, promovendo baixo acoplamento e alta coesão.
+O sistema MUST ser desenvolvido utilizando arquitetura de microserviÃ§os, seguindo rigorosamente as prÃ¡ticas de Clean Architecture. Os limites entre as camadas (Domain, Use Cases, Interfaces/Adapters, Infrastructure) devem ser protegidos e restritos em cada serviÃ§o, promovendo baixo acoplamento e alta coesÃ£o.
 
 ### II. Database per Service
-Cada microserviço MUST possuir e gerenciar independentemente seu próprio banco de dados isolado usando PostgreSQL. É expressamente proibido que um serviço realize leitura ou gravação direta no banco de dados de outro serviço; todo acesso aos dados entre fronteiras deve ocorrer exclusivamente por meio de APIs expostas (síncronas) ou eventos (assíncronos).
+Cada microserviÃ§o MUST possuir e gerenciar independentemente seu prÃ³prio banco de dados isolado usando PostgreSQL. Ã‰ expressamente proibido que um serviï¿½o realize leitura ou gravaÃ§Ã£o direta no banco de dados de outro serviÃ§o; todo acesso aos dados entre fronteiras deve ocorrer exclusivamente por meio de APIs expostas (sÃ­ncronas) ou eventos (assÃ­ncronos).
 
 ### III. IA Driven by Gemini & Pydantic
-Toda a camada de análise de IA e geração de conteúdo MUST utilizar exclusivamente o modelo Gemini 3.1 Pro Preview. A validação contínua de entrada e saída de dados MUST obrigatoriamente fazer uso rigoroso de schemas Pydantic para garantir a conformidade dos contratos da aplicação.
+Toda a camada de anï¿½lise de IA e geraÃ§Ã£o de conteï¿½do MUST utilizar exclusivamente o modelo Gemini 3.1 Pro Preview. A validaï¿½ï¿½o contï¿½nua de entrada e saï¿½da de dados MUST obrigatoriamente fazer uso rigoroso de schemas Pydantic para garantir a conformidade dos contratos da aplicaÃ§Ã£o.
 
 ### IV. Security First
-A segurança é prioritária e inegociável no design de cada função. Toda função, API, processamento de evento ou serviço gerado DEVE possuir forte validação de inputs, aplicar o princípio do menor privilégio e garantir de forma contínua que nenhum vazamento de informações sensíveis ocorra.
+A seguranï¿½a ï¿½ prioritï¿½ria e inegociï¿½vel no design de cada funÃ§Ã£o. Toda funÃ§Ã£o, API, processamento de evento ou serviï¿½o gerado DEVE possuir forte validaÃ§Ã£o de inputs, aplicar o princï¿½pio do menor privilï¿½gio e garantir de forma contï¿½nua que nenhum vazamento de informaÃ§Ãµes sensï¿½veis ocorra.
 
 ### V. Observability by Default
-A observabilidade é mandatória. Toda operação que altera o estado do sistema, realiza chamadas de rede ou aciona processamentos de IA DEVE emitir traces e logs estruturados com o devido nível de verbosidade. Todos os logs que atravessam chamadas de vários microserviços MUST carregar Ids de rastreamento de correlação.
+A observabilidade Ã© mandatÃ³ria. Toda operaÃ§Ã£o que altera o estado do sistema, realiza chamadas de rede ou aciona processamentos de IA DEVE emitir traces e logs estruturados com o devido nÃ­vel de verbosidade. Todos os logs que atravessam chamadas de vÃ¡rios microserviÃ§os MUST carregar Ids de rastreamento de correlaÃ§ao.
 
 ## Stack Constraints
 
-A tecnologia aplicada obedece às premissas acima e limita o uso a:
-- Bancos de Dados: PostgreSQL (isolado por container/serviço)
-- IA e Previsão Analítica: Gemini 3.1 Pro Preview
-- Validação Categórica e Sanitização: Pydantic
+A tecnologia aplicada obedece ï¿½s premissas acima e limita o uso a:
+- Bancos de Dados: PostgreSQL (isolado por container/serviï¿½o)
+- IA e Previsï¿½o Analï¿½tica: Gemini 3.1 Pro Preview
+- ValidaÃ§Ã£o Categï¿½rica e SanitizaÃ§Ã£o: Pydantic
 
 ## Quality Gates
 
-As implantações e avaliações arquitetônicas devem passar por avaliações regulares para garantir aderência:
-- Nenhum microserviço com acesso a DSN de bancos de domínio alheio.
-- Falhas em pipelines onde logs exponham senhas devem rejeitar o Build do serviço.
+As implantaÃ§Ãµes e avaliaÃ§Ãµes arquitetï¿½nicas devem passar por avaliaï¿½ï¿½es regulares para garantir aderï¿½ncia:
+- Nenhum microserviï¿½o com acesso a DSN de bancos de domï¿½nio alheio.
+- Falhas em pipelines onde logs exponham senhas devem rejeitar o Build do serviï¿½o.
 
 ## Governance
 
-O que está disposto nesta constituição sobrepõe-se a toda documentação de arquitetura base, guias de time ou propostas isoladas de frameworks. Alterações nesta estrutura requererão nova emenda constitucional com documentação do impacto técnico e aprovação mandatória.
+O que estï¿½ disposto nesta constituiï¿½ï¿½o sobrepï¿½e-se a toda documentaï¿½ï¿½o de arquitetura base, guias de time ou propostas isoladas de frameworks. Alteraï¿½ï¿½es nesta estrutura requererï¿½o nova emenda constitucional com documentaï¿½ï¿½o do impacto tï¿½cnico e aprovaï¿½ï¿½o mandatï¿½ria.
 
 **Version**: 1.0.0 | **Ratified**: 2026-05-04 | **Last Amended**: 2026-05-04

@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  # --- INFRAESTRUTURA LOCAL ---
+  
+  # Emulador de Azure Storage (Blob e Queues)
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: hackathon-azurite
+    hostname: azurite
+    restart: always
+    ports:
+      - "10000:10000" # Blob Service
+      - "10001:10001" # Queue Service
+    command: "azurite-blob --blobHost 0.0.0.0 --azurite-queue --queueHost 0.0.0.0"
+
+  # Banco de Dados do Upload Service
+  db-upload:
+    image: postgres:15-alpine
+    container_name: db-upload
+    restart: always
+    environment:
+      POSTGRES_USER: user_upload
+      POSTGRES_PASSWORD: password_upload
+      POSTGRES_DB: upload_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_upload_data:/var/lib/postgresql/data
+
+  # Banco de Dados do Report Service (Isolamento exigido pelo edital)
+  db-report:
+    image: postgres:15-alpine
+    container_name: db-report
+    restart: always
+    environment:
+      POSTGRES_USER: user_report
+      POSTGRES_PASSWORD: password_report
+      POSTGRES_DB: report_db
+    ports:
+      - "5433:5432" # Mapeia a porta externa 5433 para a 5432 interna
+    volumes:
+      - postgres_report_data:/var/lib/postgresql/data
+
+  # --- MICROSSERVIÇOS ---
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - UPLOAD_SERVICE_URL=http://upload-service:8000
+      - REPORT_SERVICE_URL=http://report-service:8000
+    depends_on:
+      - upload-service
+      - report-service
+
+  upload-service:
+    build:
+      context: .
+      dockerfile: services/upload-service/Dockerfile
+    container_name: upload-service
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql://user_upload:password_upload@db-upload:5432/upload_db
+      - AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;
+    depends_on:
+      - db-upload
+      - azurite
+
+  ai-processor:
+    build:
+      context: .
+      dockerfile: services/ai-processor/Dockerfile
+    container_name: ai-processor
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - UPLOAD_SERVICE_URL=http://upload-service:8000
+      - REPORT_SERVICE_URL=http://report-service:8000
+      - AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;
+    depends_on:
+      - azurite
+
+  report-service:
+    build:
+      context: .
+      dockerfile: services/report-service/Dockerfile
+    container_name: report-service
+    ports:
+      - "8003:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user_report:password_report@db-report:5432/report_db
+    depends_on:
+      - db-report
+
+volumes:
+  postgres_upload_data:
+  postgres_report_data:
+
+networks:
+  default:
+    name: hackathon-network
