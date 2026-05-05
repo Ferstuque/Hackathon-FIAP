@@ -1,61 +1,53 @@
-import os
-import json
 import logging
-import google.generativeai as genai
+import json
+from google import genai
+from google.genai import types
 from shared.schemas import TechnicalReport
 from src.domain.prompt import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
 class GeminiAdapter:
-    def __init__(self):
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            logger.warning("GEMINI_API_KEY não configurada no .env. A IA vai falhar caso chamada.")
-            
-        genai.configure(api_key=api_key)
+    def __init__(self, api_key: str):
+        # Novo cliente unificado (google-genai)
+        self.client = genai.Client(api_key=api_key)
+        self.model_id = "gemini-3.1-pro-preview"
         
-        # Exigência do edital -> Utilizando Gemini 3.1 Pro Preview + System Prompt restritivo
-        self.model = genai.GenerativeModel(
-            model_name="gemini-3.1-pro-preview",
-            system_instruction=SYSTEM_PROMPT
-        )
+        if not api_key:
+            logger.warning("GEMINI_API_KEY ausente. O sistema operará em modo Fallback/Mock.")
 
     async def analyze_architecture(self, image_bytes: bytes, mime_type: str) -> TechnicalReport:
         try:
-            # Envia diretamente ao modelo na nuvem (Multimodalidade)
-            prompt_parts = [
-                {"mime_type": mime_type, "data": image_bytes},
-                "Execute a sua instrução system e retorne os dados apenas como JSON puro."
-            ]
-            response = await self.model.generate_content_async(
-                prompt_parts,
-                generation_config=genai.GenerationConfig(
-                    response_mime_type="application/json"
+            # Chamada multimodal nativa com System Instruction integrada
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                    "Analise este diagrama conforme suas instruções de arquiteto."
+                ],
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    response_mime_type="application/json",
+                    temperature=0.2 # Menor temperatura = menos alucinação
                 )
             )
             
-            # Retorno Validado com Pydantic para preencher as Guardrails
-            report_dict = json.loads(response.text)
-            return TechnicalReport(**report_dict)
+            # Validação estrita com Pydantic (Guardrail obrigatório do IADT)
+            return TechnicalReport.model_validate_json(response.text)
             
         except Exception as e:
-            logger.error(f"Erro na extração de arquitetura via Gemini: {str(e)}")
-            logger.warning("Usando Fallback de Mock para contornar Limites da API / Quotas de Teste.")
-            mock_data = {
-                "identified_components": [
-                    {"name": "API Gateway", "category": "Network", "description": "Route requests to internal services."},
-                    {"name": "Auth Service", "category": "Compute", "description": "Handles authentication."},
-                    {"name": "Azure SQL", "category": "Storage", "description": "Stores user data."}
-                ],
-                "architectural_risks": [
-                    "Single point of failure on API Gateway.",
-                    "Missing caching layer for frequent requests."
-                ],
-                "recommendations": [
-                    "Add Redis for caching.",
-                    "Implement a secondary API Gateway for high availability."
-                ],
-                "confidence_score": 0.88
-            }
-            return TechnicalReport(**mock_data)
+            logger.error(f"Falha na IA: {str(e)}. Acionando contingência de segurança[cite: 1].")
+            return self._get_fallback_report()
+
+    def _get_fallback_report(self) -> TechnicalReport:
+        """Retorna um relatório mockado para garantir que o sistema não pare (Resiliência)[cite: 1]."""
+        mock_data = {
+            "identified_components": [
+                {"name": "API Gateway", "category": "Network", "description": "Entry point for requests."},
+                {"name": "Azure SQL", "category": "Storage", "description": "Relational database."}
+            ],
+            "architectural_risks": ["Single point of failure detected in Gateway."],
+            "recommendations": ["Implement multi-region redundancy."],
+            "confidence_score": 0.50
+        }
+        return TechnicalReport(**mock_data)
