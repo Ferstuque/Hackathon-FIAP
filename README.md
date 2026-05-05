@@ -2,13 +2,22 @@
 
 Bem-vindo ao **Architecture Analyzer**! Este projeto foi desenvolvido para o Hackathon da FIAP e consiste em uma solução baseada em **Microsserviços**, orientada a eventos e alimentada por Inteligência Artificial (**Gemini 3.1 Pro Preview**) para extrair e diagnosticar componentes, riscos e oferecer recomendações técnicas a partir de diagramas de arquitetura (imagens ou PDFs).
 
-## 🏛️ Arquitetura e Padrões
-A aplicação foi construída com base em **Clean Architecture** (separando Domain, Application e Infrastructure) e desenhada como uma arquitetura de microsserviços totalmente isolados.
+## 🏛️ Arquitetura de Software (SOAT)
+Em alinhamento aos requisitos do edital, a solução foi projetada com foco em resiliência, escalabilidade e Clean Architecture.
 
-- **API Gateway (`api-gateway`)**: Ponto de entrada síncrono. Cuida do roteamento, validação primária de formato e exposição das respostas finais sem tocar em bancos de dados de estado.
-- **Upload Service (`upload-service`)**: Microsserviço responsável por receber o artefato, persistir no Azure Blob Storage e lançar uma mensagem assíncrona na Azure Storage Queue alertando que há trabalho a ser feito. (Seu banco de dados mapeia o status).
-- **AI Processor (`ai-processor`)**: Um worker que roda em background em *Long Polling* extraindo mensagens da fila, processando de forma multimodal no LLM com *System Prompt* robusto baseado na técnica de Guardrails.
-- **Report Service (`report-service`)**: Persiste o json final mapeado em banco num repositório inteiramente à parte (`db_reports`).
+- **Microsserviços Isolados**: O sistema foi dividido para que cada serviço possua seu próprio ciclo de vida e banco de dados.
+  - **API Gateway (`api-gateway`)**: Ponto de entrada síncrono. Cuida do roteamento (BFF).
+  - **Upload Service (`upload-service`)**: Persiste arquivos no Azure Blob Storage e envia mensagens para a fila.
+  - **Report Service (`report-service`)**: Mantém a persistência final em JSONB isolado no Postgres (`db_reports`).
+- **Mensageria Assíncrona**: Utilização de Azure Storage Queue (emulada localmente via Azurite) permitindo o processamento em background (Long Polling) isolando o front do back da IA.
+- **Observabilidade**: Grafana e Prometheus configurados, extraindo métricas (`/metrics`) a cada 5s de todos os contêineres.
+
+## 🧠 Inteligência Artificial (IADT)
+O componente (`ai-processor`) não é um script isolado, mas sim um microsserviço assíncrono projetado em cima da técnica de Agentic Workflows (com base em conceitos de LangGraph) e LLM Guardrails utilizando **Gemini 3.1 Pro Preview**.
+
+- **Fluxo Agentic & Retry Resiliente**: Implementamos decision-nodes na cadeia da IA. A IA atua como Arquiteto Experto, Auditor DORA e Analista AISecOps. Se o relatório de extração for impreciso e não atingir a aprovação imposta pelas métricas internas (`confidence_score >= 0.4`), a classe acusa instabilidade semântica (alucinação) e dispara um **Retry autônomo** para reavaliar a imagem em novos vetores antes de falhar.
+- **Tratamento de Falhas (Fallback)**: Quando esgotado o Retry, o fallback final altera elegantemente o processo da fila para `ERRO` no banco e registra nas métricas locais, sem causar crash de container (Zero Downtime).
+- **Guardrails de Schema Estrito (Pydantic)**: Exigido estrutura com validação técnica de Componentes Visíveis, Gargalos/Métricas DORA, Postura de Segurança (SPOFs) e Recomendações *Azure Well-Architected Framework*.
 
 ## 🛠️ Stack Tecnológica
 
@@ -66,8 +75,12 @@ Nossa arquitetura e ciclo de vida seguem a diretriz **"Local-First to Cloud-Nati
 
 ### 📍 Planejamento de Execução Atual
 - [x] **Fase 1 (Base e Integração E2E)**: Comunicação assíncrona validada, com CI/CD, banco de dados JSONB e conectores isolados fechados com sucesso.
-- [ ] **Fase 2 (Resiliência e Visibilidade)**:
-  - **1) Dashboards de Observabilidade**: Subir stack local (Grafana/Prometheus/logs estruturados) consumindo a Telemetria e métricas de Performance da IA (Concluído).
-  - **2) Evolução do Prompt de IA**: Aprimorar o foco nos pilares do Azure Well-Architected Framework, DORA metrics e incluir Retry Agentic Pattern com base em `tenacity` e métricas de confiança da IA (Concluído).
-  - **3) Resiliência com Filas de Mensagens Mortas**: Garantia de reprocessamento implementando DLQ (Dead Letter Queue) no Azure Storage Queue.
-- [ ] **Fase 3-4 (Refinamento Avançado)**: Polimento dos Guardrails Pydantic validando rigidamente o Gemini 3.1 Pro Preview, além do fine-tuning antes do deploy oficial na Azure Cloud.
+- [x] **Fase 2 (Resiliência da Solução)**:
+  - **1) Dashboards de Observabilidade**: Subir stack local (Grafana/Prometheus/logs estruturados) consumindo a Telemetria da arquitetura e da IA.
+  - **2) Evolução Agentic do Prompt**: Aprimorar foco em Azure Well-Architected Framework, DORA metrics e incluir Retry Agentic Pattern (Tenacity) para inibir alucinações e proteger o parser Pydantic.
+- [ ] **Fase 3 (Segurança Avançada e IA)**:
+  - **1) LLM-as-a-Judge**: Implementar um segundo nó avaliador rápido na cadeia do LangGraph para validar a recomendação contra alucinações antes da persistência.
+  - **2) Defesa contra Prompt Injection**: Incluir nó de sanitização de Input via Visão Computacional (OCR restrito) alertando a esteira sobre envenenamento na imagem ou PDF upado.
+  - **3) LangChain / Instructor Estrito**: Refatorar o modelo de Retry manual utilizando `instructor` puro acoplado com classes Pydantic forçando Strict JSON mode no Request pro Gemini.
+  - **4) Fila de Mensagens Mortas (DLQ)**: Enviar as mensagens falhas definitivamente da fila padrão (`analyze-queue`) para uma de refugo para análise de segurança sem impactar a fila ativa.
+- [ ] **Fase 4 (Entrega Final e Deploy)**: Empacotar ambiente final e rodar os scripts de infraestrutura diretamente na Cloud Azure.
