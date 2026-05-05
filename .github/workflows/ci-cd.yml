@@ -1,5 +1,8 @@
 name: CI Pipeline
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 on:
   push:
     branches:
@@ -21,7 +24,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13" # Github Actions ainda não possui suporte estável ao 3.14, usamos a mais recente
+          python-version: "3.13"
           cache: 'pip'
 
       - name: Install Dependencies
@@ -49,10 +52,10 @@ jobs:
     
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
           cache: 'pip'
@@ -61,7 +64,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r services/ai-processor/requirements.txt
-          pip install pytest pytest-asyncio httpx coverage
+          pip install pytest pytest-asyncio pytest-cov httpx coverage
 
       - name: Run Tests with Coverage
         env:
