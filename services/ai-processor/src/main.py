@@ -7,8 +7,8 @@ from src.infrastructure.gemini_adapter import GeminiAdapter
 from src.infrastructure.http_adapter import HttpAdapter
 from src.application.analyze_diagram_use_case import AnalyzeDiagramUseCase
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from shared.telemetry import setup_telemetry_logger, TelemetryMiddleware
+logger = setup_telemetry_logger("ai-processor")
 
 azure_adapter = AzureAdapter()
 gemini_adapter = GeminiAdapter()
@@ -39,6 +39,8 @@ app = FastAPI(
     title="AI Processor Worker",
     lifespan=lifespan
 )
+
+app.add_middleware(TelemetryMiddleware, service_name="ai-processor")
 
 @app.get("/health")
 async def health():

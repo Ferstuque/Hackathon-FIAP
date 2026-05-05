@@ -1,5 +1,7 @@
 import logging
 import json
+import time
+from pydantic import ValidationError
 from google import genai
 from google.genai import types
 from shared.schemas import TechnicalReport
@@ -17,6 +19,7 @@ class GeminiAdapter:
             logger.warning("GEMINI_API_KEY ausente. O sistema operará em modo Fallback/Mock.")
 
     async def analyze_architecture(self, image_bytes: bytes, mime_type: str) -> TechnicalReport:
+        start_time = time.perf_counter()
         try:
             # Chamada multimodal nativa com System Instruction integrada
             response = self.client.models.generate_content(
@@ -33,10 +36,20 @@ class GeminiAdapter:
             )
             
             # Validação estrita com Pydantic (Guardrail obrigatório do IADT)
-            return TechnicalReport.model_validate_json(response.text)
+            report = TechnicalReport.model_validate_json(response.text)
+            
+            duration = time.perf_counter() - start_time
+            logger.info("Analise do Gemini concluida com sucesso.", extra={"extra_data": {"metric_type": "ai_inference", "ai_analysis_duration_seconds": round(duration, 4), "confidence_score": report.confidence_score, "pydantic_validation_success": 1}})
+            return report
+            
+        except ValidationError as ve:
+            duration = time.perf_counter() - start_time
+            logger.error(f"Falha de validacao Pydantic: {str(ve)}", extra={"extra_data": {"metric_type": "ai_inference", "ai_analysis_duration_seconds": round(duration, 4), "pydantic_validation_errors_total": 1, "error_reason": "validation_guardrail_failed"}})
+            return self._get_fallback_report()
             
         except Exception as e:
-            logger.error(f"Falha na IA: {str(e)}. Acionando contingência de segurança[cite: 1].")
+            duration = time.perf_counter() - start_time
+            logger.error(f"Falha na IA: {str(e)}. Acionando contingência de segurança", extra={"extra_data": {"metric_type": "ai_inference", "ai_analysis_duration_seconds": round(duration, 4), "error_reason": str(e)}})
             return self._get_fallback_report()
 
     def _get_fallback_report(self) -> TechnicalReport:

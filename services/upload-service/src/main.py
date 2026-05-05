@@ -6,8 +6,12 @@ from datetime import datetime
 from src.infrastructure.azure_adapter import AzureAdapter
 from src.application.upload_use_case import UploadDiagramUseCase
 from shared.schemas import AnalysisProcess, AnalysisStatus
+from shared.telemetry import setup_telemetry_logger, TelemetryMiddleware
+
+logger = setup_telemetry_logger("upload-service")
 
 app = FastAPI(title="Upload Service")
+app.add_middleware(TelemetryMiddleware, service_name="upload-service")
 
 azure_adapter = AzureAdapter()
 upload_use_case = UploadDiagramUseCase(azure_adapter)

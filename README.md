@@ -59,3 +59,15 @@ docker-compose exec upload-service pytest --cov=src tests/ --cov-report=term-mis
 ```
 
 Os testes são executados automaticamente através do GitHub Actions, comprovando a eficácia e entrega do requisito CI/CD do Hackathon.
+
+## 🗺️ Estratégia e Desdobramento (Roadmap)
+
+Nossa arquitetura e ciclo de vida seguem a diretriz **"Local-First to Cloud-Native"**. Toda a engenharia, integração e validação são feitas e provadas primeiro no ambiente local (utilizando containers Docker, emuladores como Azurite para Azure Storage e mocks de IA controlados), garantindo zero surpresas e custo zero. Logo após a validação bem-sucedida do pipeline E2E, a estrutura é provisionada e **escalada nativamente na Azure Cloud**, conectando aos recursos gerenciados oficiais.
+
+### 📍 Planejamento de Execução Atual
+- [x] **Fase 1 (Base e Integração E2E)**: Comunicação assíncrona validada, com CI/CD, banco de dados JSONB e conectores isolados fechados com sucesso.
+- [ ] **Fase 2 (Resiliência e Visibilidade)**:
+  - **1) Dashboards de Observabilidade**: Subir stack local (Grafana/Prometheus/logs estruturados) consumindo a Telemetria e métricas de Performance da IA.
+  - **2) Evolução do Prompt de IA**: Aprimorar o foco nos pilares do Well-Architected Framework e DORA metrics.
+  - **3) Resiliência com Filas de Mensagens Mortas**: Garantia de reprocessamento implementando DLQ (Dead Letter Queue) no Azure Storage Queue.
+- [ ] **Fase 3-4 (Refinamento Avançado)**: Polimento dos Guardrails Pydantic validando rigidamente o Gemini 3.1 Pro Preview, além do fine-tuning antes do deploy oficial na Azure Cloud.

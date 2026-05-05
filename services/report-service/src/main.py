@@ -6,9 +6,9 @@ from contextlib import asynccontextmanager
 from src.infrastructure.db_adapter import DatabaseAdapter
 from src.application.report_use_case import SaveReportUseCase, GetReportUseCase
 from shared.schemas import TechnicalReport
+from shared.telemetry import setup_telemetry_logger, TelemetryMiddleware
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = setup_telemetry_logger("report-service")
 
 db_adapter = DatabaseAdapter()
 save_use_case = SaveReportUseCase(db_adapter)
@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="Report Service", lifespan=lifespan)
+app.add_middleware(TelemetryMiddleware, service_name="report-service")
 
 class ReportPayload(BaseModel):
     process_id: str

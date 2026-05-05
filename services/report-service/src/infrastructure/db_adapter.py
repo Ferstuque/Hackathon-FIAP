@@ -2,7 +2,8 @@ import os
 import json
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy import Column, String, JSON
+from sqlalchemy import Column, String
+from sqlalchemy.dialects.postgresql import JSONB
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/db_reports")
 
@@ -14,7 +15,7 @@ Base = declarative_base()
 class ReportModel(Base):
     __tablename__ = "reports"
     process_id = Column(String, primary_key=True, index=True)
-    report_data = Column(JSON, nullable=False)
+    report_data = Column(JSONB, nullable=False)
 
 class DatabaseAdapter:
     async def init_db(self):
