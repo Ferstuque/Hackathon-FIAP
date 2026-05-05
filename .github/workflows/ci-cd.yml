@@ -39,10 +39,9 @@ jobs:
 
       - name: Run Tests with Coverage
         env:
-          PYTHONPATH: ${{ github.workspace }}/services/upload-service:${{ github.workspace }}/shared
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/services/upload-service
         run: |
           cd services/upload-service
-          # O comando abaixo agora será reconhecido porque instalamos o pytest-cov acima
           pytest --cov=src tests/ --cov-report=xml --cov-report=term-missing
 
       - name: Upload Coverage to Actions
