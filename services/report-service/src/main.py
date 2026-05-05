@@ -7,6 +7,7 @@ from src.infrastructure.db_adapter import DatabaseAdapter
 from src.application.report_use_case import SaveReportUseCase, GetReportUseCase
 from shared.schemas import TechnicalReport
 from shared.telemetry import setup_telemetry_logger, TelemetryMiddleware
+from prometheus_client import make_asgi_app
 
 logger = setup_telemetry_logger("report-service")
 
@@ -21,6 +22,9 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="Report Service", lifespan=lifespan)
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
 app.add_middleware(TelemetryMiddleware, service_name="report-service")
 
 class ReportPayload(BaseModel):

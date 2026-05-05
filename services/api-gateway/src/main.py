@@ -2,6 +2,7 @@ from fastapi import FastAPI, status
 import logging
 from src.api.router import api_router
 from shared.telemetry import setup_telemetry_logger, TelemetryMiddleware
+from prometheus_client import make_asgi_app
 
 logger = setup_telemetry_logger("api-gateway")
 
@@ -10,6 +11,9 @@ app = FastAPI(
     description="Ponto de entrada único para o upload e consulta de análise de arquitetura",
     version="1.0.0"
 )
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
 
 # Adiciona o Middleware de Telemetria / Monitoramento
 app.add_middleware(TelemetryMiddleware, service_name="api-gateway")

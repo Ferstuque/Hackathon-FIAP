@@ -8,6 +8,8 @@ from src.infrastructure.http_adapter import HttpAdapter
 from src.application.analyze_diagram_use_case import AnalyzeDiagramUseCase
 
 from shared.telemetry import setup_telemetry_logger, TelemetryMiddleware
+from prometheus_client import make_asgi_app
+
 logger = setup_telemetry_logger("ai-processor")
 
 azure_adapter = AzureAdapter()
@@ -39,6 +41,9 @@ app = FastAPI(
     title="AI Processor Worker",
     lifespan=lifespan
 )
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
 
 app.add_middleware(TelemetryMiddleware, service_name="ai-processor")
 

@@ -7,10 +7,14 @@ from src.infrastructure.azure_adapter import AzureAdapter
 from src.application.upload_use_case import UploadDiagramUseCase
 from shared.schemas import AnalysisProcess, AnalysisStatus
 from shared.telemetry import setup_telemetry_logger, TelemetryMiddleware
+from prometheus_client import make_asgi_app
 
 logger = setup_telemetry_logger("upload-service")
 
 app = FastAPI(title="Upload Service")
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
 app.add_middleware(TelemetryMiddleware, service_name="upload-service")
 
 azure_adapter = AzureAdapter()

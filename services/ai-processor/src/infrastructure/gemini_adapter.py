@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 class GeminiAdapter:
     def __init__(self, api_key: str):
-        # Novo cliente unificado (google-genai)
         self.client = genai.Client(api_key=api_key)
         self.model_id = "gemini-3.1-pro-preview"
         

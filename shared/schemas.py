@@ -25,13 +25,16 @@ class TechnicalReport(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     identified_components: list[ArchitectureComponent] = Field(
-        description="Lista de componentes identificados na imagem ou PDF"
+        description="Lista de componentes identificados (ex: Compute, Database, Observability)"
     )
     architectural_risks: list[str] = Field(
-        description="Possíveis riscos de segurança, escalabilidade ou pontos únicos de falha"
+        description="Possíveis riscos: segurança, escalabilidade (DORA), pontos únicos de falha ou falta de resiliência"
     )
     recommendations: list[str] = Field(
-        description="Sugestões técnicas e melhorias baseadas em boas práticas"
+        description="Sugestões técnicas e de governança focadas em Azure Well-Architected e AISecOps"
+    )
+    security_posture: str | None = Field(
+        default=None, description="Avaliação da postura de segurança, acessibilidade e isolamento (Network/WAF)"
     )
     confidence_score: float = Field(
         ge=0, le=1, description="Grau de confiança da IA na análise do diagrama"
