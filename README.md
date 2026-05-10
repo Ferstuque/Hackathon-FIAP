@@ -31,6 +31,17 @@ O componente (`ai-processor`) não é um script isolado, mas sim um microsservi�
 
 ## ⚙️ Pré-requisitos e Execução (Custo Zero)
 
+## 🛡️ Segurança (IA e Infraestrutura)
+Atendendo aos requisitos do edital do hackathon relativos à rastreabilidade, resiliência e controle na adoção de IAs:
+
+- **Estratégias de Validação de Input (Prompt Injection Defense)**: Antes da cadeia de IA (Gemini) gerar o laudo final, o diagrama que ingressa por upload passa por um nó específico (`_evaluate_input_guardrail`) que atua rastreando e bloqueando comandos maliciosos escondidos na imagem, visando mitigar injeção de instruções e vazamento de prompt interno (jailbreaking).
+- **Controle de Modelo e LLM-as-a-Judge**: Para mitigar as **alucinações arquiteturais**, a resposta não vai direto para a persistência. O componente (`_judge_output`) atua emulando uma validação "Juiz de IA", reavaliando as premissas entregues no laudo da primeira análise contra a imagem em si. Se comprovado que há omissão severa ou alucinação sobre a imagem, a nota de confiança (`confidence_score`) do relatório é deteriorada o suficiente para rejeição do laudo.
+- **Tratamento Seguro de Falhas da IA e DLQ**: Se ocorrer injeção bloqueada ou instabilidade sintática que quebra as amarras estritamente JSON predefinidas *(Pydantic Strict ValidationError)* do modelo de machine learning, o ambiente levanta exceção controlada no Use Case e jorra um *Fallback*. Além de não destruir nem gerar picos nos contêineres, o sistema de infraestrutura em `AzureAdapter` reencaminha essa mensagem atípica para uma ***DLQ (*Dead Letter Queue*)*** para investigação offline por analistas de segurança, atualizando de forma síncrona o Microsserviço de Upload com o `status="ERRO"`.
+- **Práticas Mínimas de Segurança entre Serviços**:
+  - Restrição aos métodos HTTP.
+  - Rede isolada de contêineres e port bindings intencionais sem exposição generalizada de BD para fora.
+  - Isolamento de instâncias e volumes separados por serviços (Banco `upload_db` completamente segregado e independente do repositório `report_db`).
+
 1. Você precisará ter o **Docker** e o **Docker Compose** instalados na sua máquina.
 2. Na raiz do repositório, crie um arquivo `.env` (ou utilize variáveis de ambiente exportadas) provendo a sua chave do Gemini:
    ```env
@@ -78,9 +89,8 @@ Nossa arquitetura e ciclo de vida seguem a diretriz **"Local-First to Cloud-Nati
 - [x] **Fase 2 (Resiliência da Solução)**:
   - **1) Dashboards de Observabilidade**: Subir stack local (Grafana/Prometheus/logs estruturados) consumindo a Telemetria da arquitetura e da IA.
   - **2) Evolução Agentic do Prompt**: Aprimorar foco em Azure Well-Architected Framework, DORA metrics e incluir Retry Agentic Pattern (Tenacity) para inibir alucinações e proteger o parser Pydantic.
-- [ ] **Fase 3 (Segurança Avançada e IA)**:
+- [x] **Fase 3 (Segurança Avançada e IA)**:
   - **1) LLM-as-a-Judge**: Implementar um segundo nó avaliador rápido na cadeia do LangGraph para validar a recomendação contra alucinações antes da persistência.
   - **2) Defesa contra Prompt Injection**: Incluir nó de sanitização de Input via Visão Computacional (OCR restrito) alertando a esteira sobre envenenamento na imagem ou PDF upado.
-  - **3) LangChain / Instructor Estrito**: Refatorar o modelo de Retry manual utilizando `instructor` puro acoplado com classes Pydantic forçando Strict JSON mode no Request pro Gemini.
-  - **4) Fila de Mensagens Mortas (DLQ)**: Enviar as mensagens falhas definitivamente da fila padrão (`analyze-queue`) para uma de refugo para análise de segurança sem impactar a fila ativa.
+  - **3) LangChain / Instructor Estrito e DLQ**: Fila de Mensagens Mortas (DLQ) configurada. Envia as mensagens falhas definitivamente da fila padrão (`analysis-queue`) para uma de refugo para análise de segurança sem impactar a fila ativa.
 - [ ] **Fase 4 (Entrega Final e Deploy)**: Empacotar ambiente final e rodar os scripts de infraestrutura diretamente na Cloud Azure.

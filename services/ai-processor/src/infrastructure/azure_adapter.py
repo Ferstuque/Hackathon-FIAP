@@ -12,11 +12,13 @@ AZURE_STORAGE_CONNECTION_STRING = os.getenv(
 )
 CONTAINER_NAME = os.getenv("CONTAINER_NAME", "diagrams")
 QUEUE_NAME = os.getenv("QUEUE_NAME", "analysis-queue")
+DLQ_NAME = os.getenv("DLQ_NAME", "dlq-queue")
 
 class AzureAdapter:
     def __init__(self):
         self.blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
         self.queue_client = QueueClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING, QUEUE_NAME)
+        self.dlq_client = QueueClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING, DLQ_NAME)
 
     async def get_blob_content(self, filename: str) -> bytes:
         """Faz o download do arquivo a partir do Blob Storage"""
@@ -39,3 +41,11 @@ class AzureAdapter:
     async def delete_message(self, msg):
         """Remove a mensagem da fila indicando sucesso do processamento"""
         await self.queue_client.delete_message(msg)
+
+    async def send_to_dlq(self, payload: dict):
+        """Envia a mensagem falha para a Dead Letter Queue"""
+        try:
+            await self.dlq_client.create_queue()
+        except Exception:
+            pass
+        await self.dlq_client.send_message(json.dumps(payload))

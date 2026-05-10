@@ -4,10 +4,8 @@ from uuid import UUID
 from datetime import datetime
 
 from src.infrastructure.azure_adapter import AzureAdapter
+from src.infrastructure.db_adapter import DatabaseAdapter
 from src.application.upload_use_case import UploadDiagramUseCase
-from shared.schemas import AnalysisProcess, AnalysisStatus
-from shared.telemetry import setup_telemetry_logger, TelemetryMiddleware
-from prometheus_client import make_asgi_app
 
 logger = setup_telemetry_logger("upload-service")
 
@@ -18,7 +16,12 @@ app.mount("/metrics", metrics_app)
 app.add_middleware(TelemetryMiddleware, service_name="upload-service")
 
 azure_adapter = AzureAdapter()
+db_adapter = DatabaseAdapter()
 upload_use_case = UploadDiagramUseCase(azure_adapter)
+
+@app.on_event("startup")
+async def startup_event():
+    await db_adapter.init_db()
 
 @app.post("/internal/upload", status_code=status.HTTP_201_CREATED)
 async def upload_file(file: UploadFile = File(...)):
@@ -29,7 +32,8 @@ async def upload_file(file: UploadFile = File(...)):
     
     try:
         record = await upload_use_case.execute(file.filename, content)
-        # Em um cenário real, persistir o record no banco (db_upload)
+        # Salva o status inicial no banco (db-upload)
+        await db_adapter.save_process(str(record.id), record.filename, AnalysisStatus.RECEBIDO.value)
         
         return {
             "id": record.id,
@@ -44,13 +48,21 @@ async def upload_file(file: UploadFile = File(...)):
 
 @app.get("/internal/status/{process_id}")
 async def get_status(process_id: UUID):
-    # Mock para MVP - Retornando analisado para não esgotar polling e acelerar teste E2E
+    process = await db_adapter.get_process(str(process_id))
+    if not process:
+        raise HTTPException(status_code=404, detail="Processo nao encontrado")
+    
     return {
-        "id": process_id,
-        "status": AnalysisStatus.ANALISADO.value
+        "id": process.process_id,
+        "filename": process.filename,
+        "status": process.status,
+        "created_at": process.created_at.isoformat()
     }
 
+class StatusUpdate(BaseModel):
+    status: AnalysisStatus
+
 @app.patch("/internal/status/{process_id}")
-async def patch_status(process_id: UUID, status_update: dict):
-    # Mock para MVP - Retorna OK para aplacar o AI Processor
+async def patch_status(process_id: UUID, status_update: StatusUpdate):
+    await db_adapter.update_status(str(process_id), status_update.status.value)
     return {"message": "Status atualizado com sucesso"}
