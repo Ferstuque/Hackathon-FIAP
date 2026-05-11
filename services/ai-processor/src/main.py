@@ -12,8 +12,9 @@ from prometheus_client import make_asgi_app
 
 logger = setup_telemetry_logger("ai-processor")
 
+import os
 azure_adapter = AzureAdapter()
-gemini_adapter = GeminiAdapter()
+gemini_adapter = GeminiAdapter(api_key=os.getenv("GEMINI_API_KEY", ""))
 http_adapter = HttpAdapter()
 processor_use_case = AnalyzeDiagramUseCase(gemini_adapter, azure_adapter, http_adapter)
 

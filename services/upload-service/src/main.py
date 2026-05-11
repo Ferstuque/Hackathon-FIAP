@@ -6,6 +6,9 @@ from datetime import datetime
 from src.infrastructure.azure_adapter import AzureAdapter
 from src.infrastructure.db_adapter import DatabaseAdapter
 from src.application.upload_use_case import UploadDiagramUseCase
+from shared.telemetry import setup_telemetry_logger, TelemetryMiddleware
+from prometheus_client import make_asgi_app
+from shared.schemas import AnalysisStatus
 
 logger = setup_telemetry_logger("upload-service")
 
