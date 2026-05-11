@@ -1,0 +1,101 @@
+name: Build and Deploy (Cloud-Native)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY_NAME: acr${{ secrets.ENV_ID }} # Adjust based on your deployment
+  RESOURCE_GROUP: hackathon-fiap-rg
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Run Unit Tests (Upload Service)
+      run: |
+        cd services/upload-service
+        pip install -r requirements.txt pytest
+        pytest tests/unit/
+        
+    - name: Run Unit Tests (AI Processor)
+      run: |
+        cd services/ai-processor
+        pip install -r requirements.txt pytest
+        pytest tests/unit/
+
+    - name: Setup Node.js (Frontend)
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    - name: Frontend Build
+      run: |
+        cd frontend
+        npm install
+        npm run build
+
+  deploy-infra:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy Bicep Infrastructure
+      uses: azure/arm-deploy@v1
+      with:
+        subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        resourceGroupName: ${{ env.RESOURCE_GROUP }}
+        template: ./infra/bicep/main.bicep
+        parameters: dbPassword=${{ secrets.DB_PASSWORD }} environmentName=hackathon-prod
+
+  deploy-apps:
+    needs: deploy-infra
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Login to ACR
+      run: az acr login --name ${{ env.REGISTRY_NAME }}
+      
+    - name: Build and Push Docker Images
+      run: |
+        # API Gateway
+        docker build -t ${{ env.REGISTRY_NAME }}.azurecr.io/api-gateway:latest ./services/api-gateway
+        docker push ${{ env.REGISTRY_NAME }}.azurecr.io/api-gateway:latest
+        
+        # Upload Service
+        docker build -t ${{ env.REGISTRY_NAME }}.azurecr.io/upload-service:latest ./services/upload-service
+        docker push ${{ env.REGISTRY_NAME }}.azurecr.io/upload-service:latest
+        
+        # AI Processor
+        docker build -t ${{ env.REGISTRY_NAME }}.azurecr.io/ai-processor:latest ./services/ai-processor
+        docker push ${{ env.REGISTRY_NAME }}.azurecr.io/ai-processor:latest
+
+    - name: Deploy to Azure Container Apps
+      run: |
+        # Update Container Apps with new images using az cli
+        az containerapp update -n api-gateway -g ${{ env.RESOURCE_GROUP }} --image ${{ env.REGISTRY_NAME }}.azurecr.io/api-gateway:latest
+        az containerapp update -n upload-service -g ${{ env.RESOURCE_GROUP }} --image ${{ env.REGISTRY_NAME }}.azurecr.io/upload-service:latest
+        az containerapp update -n ai-processor -g ${{ env.RESOURCE_GROUP }} --image ${{ env.REGISTRY_NAME }}.azurecr.io/ai-processor:latest

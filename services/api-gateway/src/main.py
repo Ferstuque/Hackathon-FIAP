@@ -1,6 +1,7 @@
 from fastapi import FastAPI, status
 import logging
 from src.api.router import api_router
+from fastapi.middleware.cors import CORSMiddleware
 from shared.telemetry import setup_telemetry_logger, TelemetryMiddleware
 from prometheus_client import make_asgi_app
 
@@ -10,6 +11,14 @@ app = FastAPI(
     title="API Gateway - Architecture Analyzer",
     description="Ponto de entrada único para o upload e consulta de análise de arquitetura",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 metrics_app = make_asgi_app()
