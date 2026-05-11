@@ -1,4 +1,4 @@
-# FIAP Secure Systems: Architecture AI Analyzer 🚀
+﻿# FIAP Secure Systems: Architecture AI Analyzer 🚀
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![React](https://img.shields.io/badge/React-v19-purple)
@@ -18,7 +18,7 @@ O sistema foi desenhado aplicando **Arquitetura Baseada em Microsserviços** (Cl
 
 ### Diagrama de Arquitetura (O Nosso Sistema)
 
-\\\mermaid
+```mermaid
 graph TD
     Client[👩‍💻 React Frontend] -->|HTTP POST| API[🚪 API Gateway / BFF]
     API -->|Encaminha| UPL[📤 Upload Service]
@@ -35,15 +35,15 @@ graph TD
     
     Client -.->|Polling GET Status & Report| API
     API -.-> REP
-\\\
+```
 
 ### Fluxo da Solução
 1. **Upload**: O cliente acessa a interface React e envia um diagrama (PNG, JPG, PDF).
-2. **Ingestão**: O \API Gateway\ recebe e joga para o \Upload Service\.
-3. **Assincronismo**: O Upload Service salva o arquivo no \Blob Storage\, posta um evento na \Fila (Queue)\ e devolve um Status HTTP 202 (Accepted). 
-4. **Processamento (IADT)**: O \AI Processor\ (rodando em background) pega a mensagem da Fila, converte o diagrama, aplica *Prompt Engineering* no Gemini Vision e aguarda o parecer.
-5. **Persistência**: O JSON estruturado do modelo é enviado ao \Report Service\ e gravado num banco de dados isolado.
-6. **Frontend Updates (SSE/Polling)**: O frontend consulta o \API Gateway\ até o status virar \ANALISADO\, renderizando então o relatório técnico em tela.
+2. **Ingestão**: O `API Gateway` recebe e joga para o `Upload Service`.
+3. **Assincronismo**: O Upload Service salva o arquivo no `Blob Storage`, posta um evento na `Fila (Queue)` e devolve um Status HTTP 202 (Accepted). 
+4. **Processamento (IADT)**: O `AI Processor` (rodando em background) pega a mensagem da Fila, converte o diagrama, aplica *Prompt Engineering* no Gemini Vision e aguarda o parecer.
+5. **Persistência**: O JSON estruturado do modelo é enviado ao `Report Service` e gravado num banco de dados isolado.
+6. **Frontend Updates (SSE/Polling)**: O frontend consulta o `API Gateway` até o status virar `ANALISADO`, renderizando então o relatório técnico em tela.
 
 ---
 
@@ -52,15 +52,15 @@ graph TD
 Requisitos: Docker e Docker Compose instalados.
 
 1. Clone o repositório.
-2. Crie na raiz um arquivo \.env\ e defina \GEMINI_API_KEY=sua_chave\.
+2. Crie na raiz um arquivo `.env` e defina `GEMINI_API_KEY=sua_chave`.
 3. Suba os containers locais:
-\\\ash
+```bash
 docker compose up --build -d
-\\\
+```
 4. Acesse:
-   - **Frontend**: \http://localhost:5173\ (Se rodar via Vite localmente: \cd frontend && npm run dev\)
-   - **API Gateway**: \http://localhost:8000/docs\
-   - **Métricas Prometheus**: \http://localhost:9090\
+   - **Frontend**: `http://localhost:5173` (Se rodar via Vite localmente: `cd frontend && npm run dev`)
+   - **API Gateway**: `http://localhost:8000/docs`
+   - **Métricas Prometheus**: `http://localhost:9090`
 
 *(Para o deploy Cloud-Native na Azure, configuramos um GitHub Actions workflow base no diretório .github/workflows/deploy.yml provisionando infraestrutura moderna Serverless usando Azure Container Apps via Bicep).*
 
@@ -79,11 +79,11 @@ Aplicamos rigorosas práticas defensivas tanto a nível de arquitetura quanto na
    - **Mitigação de Alucinação (Hallucination)**: Configuramos *Zero Temperature (T=0.1)* para as chamadas da IA limitando a criatividade e aumentando o determinismo focado na topologia da imagem.
 
 3. **Tratamento Seguro de Falhas (AI Exceptions):**
-   - Caso a API da IA caia, de timeout, ou viole o formato, o \AI Processor\ captura a exceção de forma segura, aciona uma \Dead Letter Queue (DLQ)\ e atualiza o processo para status \ERRO\ sem vazar a stacktrace interna para o usuário.
+   - Caso a API da IA caia, de timeout, ou viole o formato, o `AI Processor` captura a exceção de forma segura, aciona uma `Dead Letter Queue (DLQ)` e atualiza o processo para status `ERRO` sem vazar a stacktrace interna para o usuário.
 
 4. **Isolamento e Práticas na Comunicação:**
    - **Segurança de Rede**: Serviços internos não possuem portas expostas diretamente para a internet. Só recebem comunicação via rede privada Docker/Kubernetes.
-   - Apenas o \API Gateway\ está exposto para recebimento das chamadas (atuando como Edge router).
+   - Apenas o `API Gateway` está exposto para recebimento das chamadas (atuando como Edge router).
 
 5. **Riscos e Limitações Catalogados:**
    - *Limitação do VLM (Vision Model)*: Em diagramas extremamente densos ou com fontes muito pequenas, a IA pode omitir um microsserviço ou sub-rede.
