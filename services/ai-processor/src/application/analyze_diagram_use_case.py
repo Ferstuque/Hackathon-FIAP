@@ -31,15 +31,19 @@ class AnalyzeDiagramUseCase:
             logger.info(f"[{process_id}] Fazendo download da Imagem...")
             image_data = await self.storage.get_blob_content(blob_name)
 
-            # 3. Análise Multimodal via Gemini 3.1 Pro Preview
-            logger.info(f"[{process_id}] Extraindo dados arquiteturais via IA...")
-            report = await self.gemini.analyze_architecture(image_data, mime_type)
+            # 3. Análise Multimodal via Agente 1 (Extrai Fatos)
+            logger.info(f"[{process_id}] Extraindo dados arquiteturais via IA (Agente 1)...")
+            facts = await self.gemini.extract_architecture_facts(image_data, mime_type)
 
-            # 4. Enviar para o Report Service (Persistência isolada do DB_REPORTS)
+            # 4. Geração Padrão via Agente 2 (Gera Relatório Pydantic Exato)
+            logger.info(f"[{process_id}] Gerando JSON do Relatório através dos fatos (Agente 2)...")
+            report = await self.gemini.generate_report_from_facts(facts, image_data, mime_type)
+
+            # 5. Enviar para o Report Service (Persistência isolada do DB_REPORTS)
             logger.info(f"[{process_id}] Salvando relatório final...")
             await self.http.send_to_report_service(process_id, report)
             
-            # 5. Finalizar status e consumir a mensagem com sucesso
+            # 6. Finalizar status e consumir a mensagem com sucesso
             await self.http.update_status(process_id, AnalysisStatus.ANALISADO)
             await self.storage.delete_message(message)
             

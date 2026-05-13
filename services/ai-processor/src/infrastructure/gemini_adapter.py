@@ -12,47 +12,94 @@ logger = logging.getLogger(__name__)
 class GeminiAdapter:
     def __init__(self, api_key: str):
         self.client = genai.Client(api_key=api_key)
-        self.model_id = "gemini-3.1-pro-preview"
-        self.fallback_model_id = "gemini-2.5-flash"
+        self.model_id = "gemini-3.1-flash-lite"
+        self.fallback_model_id = "gemini-2.5-flash-lite"
         
         if not api_key:
             logger.warning("GEMINI_API_KEY ausente. O sistema operará em modo Fallback/Mock.")
 
     def _generate_content_with_fallback(self, **kwargs):
-        try:
-            return self.client.models.generate_content(model=self.model_id, **kwargs)
-        except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                logger.warning(f"Quota excedida para {self.model_id}. Usando fallback para {self.fallback_model_id}.")
-                return self.client.models.generate_content(model=self.fallback_model_id, **kwargs)
-            raise e
+        attempts = 0
+        max_attempts = 4
+        
+        while attempts < max_attempts:
+            model = self.model_id if attempts < 2 else self.fallback_model_id
+            try:
+                if attempts > 0:
+                    time.sleep(3) # Backoff entre retry
+                return self.client.models.generate_content(model=model, **kwargs)
+            except Exception as e:
+                error_str = str(e)
+                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "503" in error_str or "UNAVAILABLE" in error_str:
+                    logger.warning(f"Indisponibilidade ou quota para {model} na tentativa {attempts+1}. Erro: 503/429.")
+                    attempts += 1
+                    if attempts == max_attempts:
+                        raise e 
+                else:
+                    raise e
 
-    async def analyze_architecture(self, image_bytes: bytes, mime_type: str) -> TechnicalReport:
+    async def extract_architecture_facts(self, image_bytes: bytes, mime_type: str) -> str:
         start_time = time.perf_counter()
         try:
             # 1. Guardrail de Input (Sanitization)
             is_malicious = await self._evaluate_input_guardrail(image_bytes, mime_type)
             if is_malicious:
                 logger.error("Análise bloqueada por violação de política AISecOps (Input Guardrail).")
-                raise Exception("Prompt Injection ou Intenção Maliciosa Detectada")
+                raise Exception("Prompt Injection ou Intenção Maliciosa")
 
-            # Chamada multimodal nativa com System Instruction integrada
+            # Agente 1: Visual/Reasoning focado só na extração bruta - Modelo de visão
+            logger.info("Executando Agente 1: Extraindo fatos visuais do diagrama...")
             response = self._generate_content_with_fallback(
                 contents=[
                     types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                    "Analise este diagrama conforme suas instruções de arquiteto."
+                    "Descreva tecnicamente e de forma muito detalhada todos os componentes, bancos de dados, conexões e fluxos de dados que você identifica nesta imagem. Aja como um Arquiteto de Software descrevendo estritamente os fatos visuais, sem inventar tecnologias não listadas."
+                ],
+                config=types.GenerateContentConfig(
+                    temperature=0.1 # Focado apenas em fatos literais
+                )
+            )
+            
+            ext_duration = time.perf_counter() - start_time
+            logger.info("Agente 1 concluiu extração.", extra={"extra_data": {"metric_type": "ai_inference", "agent_1_duration_seconds": round(ext_duration, 4)}})
+            return response.text
+
+        except Exception as e:
+            logger.error(f"Falha no Agente 1 (Extração de fatos): {str(e)}")
+            raise e
+
+    async def generate_report_from_facts(self, facts: str, image_bytes: bytes, mime_type: str) -> TechnicalReport:
+        start_time = time.perf_counter()
+        try:
+            # Agente 2: Estruturador / Gerador de Relatório - Modelo apenas texto
+            logger.info("Executando Agente 2: Gerando relatório estruturado JSON...")
+            response = self._generate_content_with_fallback(
+                contents=[
+                    f"Abaixo estão os fatos extraídos de um diagrama de arquitetura por outro sistema:\n\n{facts}\n\n"
+                    "Gere a saída JSON correspondente APENAS e EXATAMENTE com as raízes definidas no schema. Não envolva o JSON em propriedades como 'architecture_report' ou 'report_metadata'."
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT,
                     response_mime_type="application/json",
-                    temperature=0.2 # Menor temperatura = menos alucinação
+                    response_schema=TechnicalReport,
+                    temperature=0.1
                 )
             )
             
-            # Validação estrita com Pydantic (Guardrail obrigatório do IADT)
-            report = TechnicalReport.model_validate_json(response.text)
+            # Pre-parse para remover a alucinação de wrapper do Gemini (ex: {"report_metadata": {...}})
+            response_text = response.text
+            try:
+                parsed_json = json.loads(response_text)
+                if "report_metadata" in parsed_json and isinstance(parsed_json["report_metadata"], dict):
+                    response_text = json.dumps(parsed_json["report_metadata"])
+                elif "architecture_report" in parsed_json and isinstance(parsed_json["architecture_report"], dict):
+                    response_text = json.dumps(parsed_json["architecture_report"])
+            except json.JSONDecodeError:
+                pass
             
-            # 2. LLM-as-a-Judge (Juiz Autônomo)
+            # Validação estrita com Pydantic (Guardrail obrigatório do IADT)
+            report = TechnicalReport.model_validate_json(response_text)
+            
+            # 2. LLM-as-a-Judge (Juiz Autônomo comparando o output FINAL x Imagem Inicial)
             is_hallucination = await self._judge_output(image_bytes, mime_type, report.model_dump_json())
             if is_hallucination:
                 logger.warning("Juiz Autônomo detectou possível alucinação arquitetural. Diminuindo confidence score.")
@@ -61,7 +108,7 @@ class GeminiAdapter:
                     raise Exception("Alucinação severa detectada pelo Juiz.")
 
             duration = time.perf_counter() - start_time
-            logger.info("Analise do Gemini concluida com sucesso.", extra={"extra_data": {"metric_type": "ai_inference", "ai_analysis_duration_seconds": round(duration, 4), "confidence_score": report.confidence_score, "pydantic_validation_success": 1}})
+            logger.info("Agente 2 concluiu geracao de relatorio com sucesso.", extra={"extra_data": {"metric_type": "ai_inference", "ai_analysis_duration_seconds": round(duration, 4), "confidence_score": report.confidence_score, "pydantic_validation_success": 1}})
             return report
             
         except ValidationError as ve:
@@ -71,7 +118,14 @@ class GeminiAdapter:
 
         except Exception as e:
             duration = time.perf_counter() - start_time
-            logger.error(f"Falha na IA: {str(e)}. Acionando contingência de segurança fallback.", extra={"extra_data": {"metric_type": "ai_inference", "ai_analysis_duration_seconds": round(duration, 4), "error_reason": str(e)}})
+            error_str = str(e)
+            # Se a exception for um erro da API (503/429) após todos os retries esgotarem, devemos tentar
+            # evitar cair de cara na contingência, mas se for inevitável, marcamos.
+            if "503" in error_str or "UNAVAILABLE" in error_str:
+                logger.error(f"Falha de API persistente no Agente 2 (503): {error_str}. Limite de retenção atingido, fallback necessário.", extra={"extra_data": {"metric_type": "ai_inference", "ai_analysis_duration_seconds": round(duration, 4), "error_reason": "API_UNAVAILABLE_FALLBACK"}})
+            else:
+                logger.error(f"Falha na geracao final da IA: {error_str}. Acionando contingência de segurança fallback.", extra={"extra_data": {"metric_type": "ai_inference", "ai_analysis_duration_seconds": round(duration, 4), "error_reason": error_str}})
+            
             return self._get_fallback_report()
 
     async def _evaluate_input_guardrail(self, image_bytes: bytes, mime_type: str) -> bool:
