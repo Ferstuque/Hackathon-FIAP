@@ -6,7 +6,7 @@ import { ProcessingStatus } from './ProcessingStatus';
 const API_BASE_URL = 'http://localhost:8000/api/v1';
 
 function App() {
-  const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'done' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'done' | 'error' | 'human_review'>('idle');
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [report, setReport] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -26,6 +26,8 @@ function App() {
             if (data.status === 'ANALISADO') {
               setStatus('done');
               fetchReport(analysisId);
+            } else if (data.status === 'AGUARDANDO_REVISAO_HUMANA') {
+              setStatus('human_review');
             } else if (data.status === 'ERRO') {
               setStatus('error');
               setErrorMessage('A IA falhou ao processar a imagem.');
@@ -148,6 +150,26 @@ function App() {
               className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors"
             >
               Tentar Novamente
+            </button>
+          </div>
+        )}
+
+        {status === 'human_review' && (
+          <div className="text-center py-16">
+            <div className="flex justify-center mb-6">
+              <svg className="w-20 h-20 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-3xl font-bold text-orange-300 mb-4">Revisão Manual Necessária (HITL)</h2>
+            <p className="text-lg text-orange-200 mb-8 max-w-2xl mx-auto">
+              O Árbitro Autônomo da IA (LLM-as-a-Judge) encontrou risco severo de alucinação ou complexidade não tratável na topologia do diagrama. Por segurança, o processo foi suspenso para intervenção humana ("Human-in-the-Loop"). Um Arquiteto de Software foi notificado e aprovará as inconsistências.
+            </p>
+            <button 
+              onClick={() => setStatus('idle')}
+              className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-medium transition-colors"
+            >
+              Processar Outro Diagrama
             </button>
           </div>
         )}

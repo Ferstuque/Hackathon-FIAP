@@ -41,7 +41,7 @@ graph TD
 1. **Upload**: O cliente acessa a interface React e envia um diagrama (PNG, JPG, PDF).
 2. **Ingestão**: O `API Gateway` recebe e joga para o `Upload Service`.
 3. **Assincronismo**: O Upload Service salva o arquivo no `Blob Storage`, posta um evento na `Fila (Queue)` e devolve um Status HTTP 202 (Accepted). 
-4. **Processamento (IADT)**: O `AI Processor` consome a fila e processa os documentos sob os status transicionais `PROCESSANDO`, `ANALISADO` ou `ERRO`.
+4. **Processamento (IADT)**: O `AI Processor` consome a fila e processa os documentos sob os status transicionais `PROCESSANDO`, `ANALISADO`, `AGUARDANDO_REVISAO_HUMANA` ou `ERRO`.
 5. **Persistência**: O JSON estruturado do modelo é enviado ao `Report Service` e gravado num banco de dados isolado.
 6. **Frontend Updates**: O frontend reativo (agora com um workspace provido de 4 novas abas: `Relatório Visual`, `Status de Processamento`, `Raw JSON`, e `Log de Processamento`) roda um *Polling* ao longo dos status de processamento até obter o JSON final.
 
@@ -52,7 +52,7 @@ Nosso sistema de IA realiza a análise passando por agentes especializados garan
 2. **Agente 1 (Reasoning / Extrator Visual)**: Exclusivo para extração literal. Um modelo multimodal (Visão) mapeia detalhadamente bancos de dados, conexões e componentes existentes na imagem, sem conclusões hipotéticas.
 3. **Agente 2 (Redator / Estruturador JSON)**: Recebe os fatos do Agente 1 e atua como formatador e classificador técnico, emitindo recomendações de arquitetura e convertendo o output estritamente sob as raízes de nosso schema JSON.
 4. **Validador (Pydantic)**: Atua junto ao agente gerador como middleware restritivo garantindo o parse do output à modelagem exata do negócio (`TechnicalReport`).
-5. **LLM-as-a-Judge**: Um juiz autônomo. Põe lado-a-lado a saída final e a imagem original. Se o juiz detectar componentes "inventados" ou omitidos, ele pune o *Confidence Score* do relatório, abortando-o caso chegue numa alucinação severa.
+5. **LLM-as-a-Judge & Human-in-the-loop (HITL)**: Um juiz autônomo põe lado-a-lado a saída final e a imagem original. Se o juiz detectar componentes "inventados" ou omitidos, ele pune o *Confidence Score* do relatório. Se o erro for **crítico e severo**, ele aborta o processamento autônomo, suspende a resposta para o frontend e direciona o fluxo para a fila de **AGUARDANDO_REVISAO_HUMANA**, acionando o Arquiteto de Software pelo console de governança.
 
 ---
 
@@ -87,9 +87,9 @@ Aplicamos rigorosas práticas defensivas tanto a nível de arquitetura quanto na
    - Utilizamos *Prompt Engineering* fortemente tipado (forçando resposta restrita ou diretivas explícitas) limitando as saídas e escopo do LLM estritamente à análise arquitetural técnica.
    - **Mitigação de Alucinação (Hallucination)**: Configuramos *Zero Temperature (T=0.1)* para as chamadas da IA limitando a criatividade e aumentando o determinismo focado na topologia da imagem.
 
-3. **Tratamento Seguro e Fallback de Modelos de IA (Resiliência):**
+3. **Tratamento Seguro, Fallback e Human-in-the-Loop (Resiliência):**
    - Possuímos uma estratégia agressiva para instabilidades: Utilizamos Backoff em Retries. Se as cotas (HTTP 429) ou indisponibilidades persistirem, o sistema faz o **Fallback rebaixando a versão do modelo** `gemini-3.1-flash-lite` graciosamente para o `gemini-2.5-flash-lite`.
-   - Se ainda houver falha total, uma contingência final segura entra acionando um relatório em formato "Mock" (garantindo que o sistema operacional não morra) ao mesmo tempo que aciona uma mensagem para a `Dead Letter Queue (DLQ)` contendo a causa da falha total para investigação futura por parte da Engenharia. O status em tela se adapta sem vazar stacktraces.
+   - Se a etapa validatória (`LLM-as-a-Judge`) suspeitar categoricamente de falha e de uma quebra de governança (alucinação severa), embutimos um padrão de **Human-in-the-loop (HITL)** para não gerar laudos corrompidos nem mascarados: o processo assume o status `AGUARDANDO_REVISAO_HUMANA`, notifica no frontend, e desloca a payload para fila de revisão técnica aguardando o override manual da Engenharia.
 
 4. **Isolamento e Práticas na Comunicação:**
    - **Segurança de Rede**: Serviços internos não possuem portas expostas diretamente para a internet. Só recebem comunicação via rede privada Docker/Kubernetes.

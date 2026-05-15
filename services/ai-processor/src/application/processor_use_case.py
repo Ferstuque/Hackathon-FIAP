@@ -3,7 +3,7 @@ import httpx
 import os
 import logging
 from src.infrastructure.azure_adapter import AzureAdapter
-from src.infrastructure.gemini_adapter import GeminiAdapter
+from src.infrastructure.gemini_adapter import GeminiAdapter, SevereHallucinationException
 from shared.schemas import TechnicalReport
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,17 @@ class ProcessorUseCase:
             logger.info(f"[{process_id}] Iniciando análise em lote via Gemini...")
             try:
                 report: TechnicalReport = await self.gemini_adapter.analyze_architecture(image_bytes, mime_type)
+            except SevereHallucinationException as se:
+                logger.error(f"[{process_id}] Alucinação Severa ({se}). Acionando Human-in-the-loop...")
+                await self.azure_adapter.send_to_dlq({
+                    "process_id": process_id,
+                    "filename": filename,
+                    "reason": "SEVERE_HALLUCINATION_REVIEW_REQUIRED"
+                })
+                # Atualizando status para requerer revisão de um humano no loop.
+                await self._update_status(process_id, "AGUARDANDO_REVISAO_HUMANA")
+                await self.azure_adapter.delete_message(message)
+                return True
             except Exception as ai_e:
                 logger.error(f"[{process_id}] Falha na analise ({ai_e}), acionando Fallback...")
                 report = self.gemini_adapter._get_fallback_report()

@@ -1,6 +1,6 @@
 import json
 import logging
-from src.infrastructure.gemini_adapter import GeminiAdapter
+from src.infrastructure.gemini_adapter import GeminiAdapter, SevereHallucinationException
 from src.infrastructure.azure_adapter import AzureAdapter
 from src.infrastructure.http_adapter import HttpAdapter
 from shared.schemas import AnalysisStatus
@@ -48,6 +48,13 @@ class AnalyzeDiagramUseCase:
             await self.storage.delete_message(message)
             
             logger.info(f"[{process_id}] Análise concluída e gravada com sucesso.")
+
+        except SevereHallucinationException as se:
+            logger.warning(f"[{process_id}] Alucinação severa detectada. Redirecionando para revisão humana.")
+            if process_id:
+                await self.http.update_status(process_id, AnalysisStatus.AGUARDANDO_REVISAO_HUMANA)
+            # Remove da fila original e pode jogar numa queue de revisão (aqui aproveitamos a DLQ por enquanto)
+            await self.storage.delete_message(message)
 
         except Exception as e:
             if process_id:

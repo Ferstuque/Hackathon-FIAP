@@ -9,6 +9,9 @@ from src.domain.prompt import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
+class SevereHallucinationException(Exception):
+    pass
+
 class GeminiAdapter:
     def __init__(self, api_key: str):
         self.client = genai.Client(api_key=api_key)
@@ -105,7 +108,7 @@ class GeminiAdapter:
                 logger.warning("Juiz Autônomo detectou possível alucinação arquitetural. Diminuindo confidence score.")
                 report.confidence_score = max(0.0, report.confidence_score - 0.4)
                 if report.confidence_score < 0.4:
-                    raise Exception("Alucinação severa detectada pelo Juiz.")
+                    raise SevereHallucinationException("Alucinação severa detectada pelo Juiz. Intervenção humana necessária.")
 
             duration = time.perf_counter() - start_time
             logger.info("Agente 2 concluiu geracao de relatorio com sucesso.", extra={"extra_data": {"metric_type": "ai_inference", "ai_analysis_duration_seconds": round(duration, 4), "confidence_score": report.confidence_score, "pydantic_validation_success": 1}})
