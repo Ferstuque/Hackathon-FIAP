@@ -20,6 +20,16 @@ class ArchitectureComponent(BaseModel):
     category: str = Field(description="Categoria (Compute, Storage, Network, Security)")
     description: str | None = Field(default=None, description="Função curta do componente no fluxo")
 
+class ArchitecturalRisk(BaseModel):
+    risk: str = Field(description="O risco arquitetural identificado")
+    severity: str = Field(description="Nível de Severidade: Alta, Média, Baixa")
+    affected_components: list[str] = Field(description="Componentes afetados pelo risco")
+
+class ActionableRecommendation(BaseModel):
+    recommendation: str = Field(description="Recomendação para mitigar o risco")
+    framework: str = Field(description="Framework de mercado associado (ex: Azure Well-Architected Framework, DORA, Zero-Trust)")
+    effort: str = Field(description="Esforço Estimado para implementar: Alto, Médio, Baixo")
+
 class TechnicalReport(BaseModel):
     """O schema que o Gemini deve preencher obrigatoriamente."""
     model_config = ConfigDict(populate_by_name=True)
@@ -27,11 +37,11 @@ class TechnicalReport(BaseModel):
     identified_components: list[ArchitectureComponent] = Field(
         description="Lista de componentes identificados (ex: Compute, Database, Observability)"
     )
-    architectural_risks: list[str] = Field(
-        description="Possíveis riscos: segurança, escalabilidade (DORA), pontos únicos de falha ou falta de resiliência"
+    architectural_risks: list[ArchitecturalRisk] = Field(
+        description="Possíveis riscos: segurança, escalabilidade (DORA), pontos únicos de falha ou falta de resiliência classificados com severidade"
     )
-    recommendations: list[str] = Field(
-        description="Sugestões técnicas e de governança focadas em Azure Well-Architected e AISecOps"
+    recommendations: list[ActionableRecommendation] = Field(
+        description="Sugestões técnicas e de governança focadas em Azure Well-Architected e AISecOps com frameworks sugeridos e esforço"
     )
     security_posture: str | None = Field(
         default=None, description="Avaliação da postura de segurança, acessibilidade e isolamento (Network/WAF)"

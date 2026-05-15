@@ -1,4 +1,7 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
+import { AIAnalysisReport } from './AIAnalysisReport';
+import { DatabaseLogs } from './DatabaseLogs';
+import { ProcessingStatus } from './ProcessingStatus';
 
 const API_BASE_URL = 'http://localhost:8000/api/v1';
 
@@ -7,6 +10,7 @@ function App() {
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [report, setReport] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'visual' | 'json' | 'logs' | 'status'>('visual');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Efeito para fazer Polling quando estiver em processamento
@@ -150,8 +154,8 @@ function App() {
 
         {status === 'done' && report && (
           <div className="animate-fade-in">
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-purple-500/30">
-              <h2 className="text-2xl font-bold text-green-300 flex items-center">
+            <div className="flex flex-col sm:flex-row items-center justify-between mb-8 pb-4 border-b border-purple-500/30">
+              <h2 className="text-2xl font-bold text-green-300 flex items-center mb-4 sm:mb-0">
                 <svg className="w-8 h-8 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 Análise Concluída
               </h2>
@@ -162,12 +166,55 @@ function App() {
                 Analisar Outro Diagrama
               </button>
             </div>
-            
-            <div className="bg-black/50 p-6 rounded-xl border border-white/5 overflow-x-auto shadow-inner">
-              <pre className="text-purple-100 font-mono text-sm leading-relaxed whitespace-pre-wrap">
-                {JSON.stringify(report, null, 2)}
-              </pre>
+
+            {/* TAB NAVIGATION */}
+            <div className="flex space-x-2 border-b border-slate-700/50 mb-6 overflow-x-auto whitespace-nowrap scrollbar-hide">
+              <button 
+                onClick={() => setActiveTab('visual')}
+                className={`py-2 px-4 font-semibold text-sm transition-colors border-b-2 ${activeTab === 'visual' ? 'border-emerald-400 text-emerald-300 bg-emerald-900/10' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+              >
+                📊 Relatório Visual
+              </button>
+              <button 
+                onClick={() => setActiveTab('status')}
+                className={`py-2 px-4 font-semibold text-sm transition-colors border-b-2 ${activeTab === 'status' ? 'border-indigo-400 text-indigo-300 bg-indigo-900/10' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+              >
+                ⚙️ Status de Processamento
+              </button>
+              <button 
+                onClick={() => setActiveTab('json')}
+                className={`py-2 px-4 font-semibold text-sm transition-colors border-b-2 ${activeTab === 'json' ? 'border-purple-400 text-purple-300 bg-purple-900/10' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+              >
+                {`{_}`} Raw JSON
+              </button>
+              <button 
+                onClick={() => setActiveTab('logs')}
+                className={`py-2 px-4 font-semibold text-sm transition-colors border-b-2 ${activeTab === 'logs' ? 'border-blue-400 text-blue-300 bg-blue-900/10' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+              >
+                🗄️ Log de Processamento
+              </button>
             </div>
+            
+            {/* TAB CONTENT */}
+            {activeTab === 'visual' && (
+              <AIAnalysisReport reportData={report} />
+            )}
+
+            {activeTab === 'status' && (
+              <ProcessingStatus currentAnalysisId={analysisId} />
+            )}
+
+            {activeTab === 'json' && (
+              <div className="bg-black/50 p-6 rounded-xl border border-white/5 overflow-x-auto shadow-inner text-left">
+                <pre className="text-purple-100 font-mono text-sm leading-relaxed whitespace-pre-wrap">
+                  {JSON.stringify(report, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            {activeTab === 'logs' && (
+              <DatabaseLogs currentAnalysisId={analysisId} />
+            )}
           </div>
         )}
 
