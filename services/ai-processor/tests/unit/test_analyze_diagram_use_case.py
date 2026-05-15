@@ -2,7 +2,7 @@ import pytest
 import json
 from unittest.mock import AsyncMock, MagicMock
 from src.application.analyze_diagram_use_case import AnalyzeDiagramUseCase
-from shared.schemas import AnalysisStatus, TechnicalReport, ArchitectureComponent
+from shared.schemas import AnalysisStatus, TechnicalReport, ArchitectureComponent, ArchitecturalRisk, ActionableRecommendation
 
 @pytest.fixture
 def mock_sqs_message():
@@ -17,8 +17,12 @@ def mock_sqs_message():
 def mock_technical_report():
     return TechnicalReport(
         identified_components=[],
-        architectural_risks=["Spof"],
-        recommendations=["Use Load Balancer"],
+        architectural_risks=[
+            ArchitecturalRisk(risk="Spof", severity="Alta", affected_components=["DB"])
+        ],
+        recommendations=[
+            ActionableRecommendation(recommendation="Use Load Balancer", framework="WAF", effort="Médio")
+        ],
         confidence_score=0.9
     )
 
