@@ -75,7 +75,7 @@ docker compose up --build -d
 
 ---
 
-## 🛡️ 4. Segurança (Seção Obrigatória)
+## 🛡️ 4. Segurança
 
 Aplicamos rigorosas práticas defensivas tanto a nível de arquitetura quanto na IA:
 
