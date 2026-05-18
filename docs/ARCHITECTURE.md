@@ -61,37 +61,37 @@ A esteira de Inteligência Artificial foi projetada em uma arquitetura orientada
 
 ```mermaid
 graph TD
-    A[Mensagem Consumida (Queue)] --> B[Input Guardrail: Sanitização]
+    A["Mensagem Consumida (Queue)"] --> B["Input Guardrail: Sanitização"]
     
-    B --> C{Há tentativa de Prompt Injection?}
+    B --> C{"Há tentativa de Prompt Injection?"}
     
-    C -- Sim --> D[Falha Restrita]
-    D --> E[Envia para DLQ / Status ERRO]
+    C -- Sim --> D["Falha Restrita"]
+    D --> E["Envia para DLQ / Status ERRO"]
     
-    C -- Não --> F[Core Node: Gemini 3.1 Pro VLM]
+    C -- Não --> F["Core Node: Gemini 3.1 Pro VLM"]
     
-    F --> G[Extract & Format: Pydantic Validation]
+    F --> G["Extract & Format: Pydantic Validation"]
     
-    G --> H{Cumpriu Schema JSON Estrito?}
+    G --> H{"Cumpriu Schema JSON Estrito?"}
     
-    H -- Não (ValidationError) --> I[Fallback Engine / Downgrade para 2.5]
+    H -- "Não (ValidationError)" --> I["Fallback Engine / Downgrade para 2.5"]
     I --> F
     
-    H -- Sim --> J[LLM-as-a-Judge Guardrail]
+    H -- Sim --> J["LLM-as-a-Judge Guardrail"]
     
-    J --> K{IA detectou alucinação / omissão?}
+    J --> K{"IA detectou alucinação / omissão?"}
     
-    K -- Sim --> L[Diminui Confidence Score do Laudo]
-    K -- Não --> M[Maintain Confidence Score]
+    K -- Sim --> L["Diminui Confidence Score do Laudo"]
+    K -- Não --> M["Maintain Confidence Score"]
     
-    L --> N{Confidence Score < 0.4?}
-    M --> O[Success Path]
+    L --> N{"Confidence Score < 0.4?"}
+    M --> O["Success Path"]
     
-    N -- Sim (Risco Severo) --> R[Human-in-the-loop / AGUARDANDO_REVISAO_HUMANA]
+    N -- "Sim (Risco Severo)" --> R["Human-in-the-loop / AGUARDANDO_REVISAO_HUMANA"]
     N -- Não --> O
     
-    O --> P[Consolidação via Pydantic + Métricas de Uso]
-    P --> Q[Persistência no PostgreSQL]
+    O --> P["Consolidação via Pydantic + Métricas de Uso"]
+    P --> Q["Persistência no PostgreSQL"]
     R --> Q
 ```
 
