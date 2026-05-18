@@ -100,4 +100,22 @@ Aplicamos rigorosas práticas defensivas tanto a nível de arquitetura quanto na
    - *Risco de Context Window*: O modelo possui um cap; topologias de altíssima escala corporativa terão recomendada a subdivisão do diagrama antes do envio.
 
 ---
+
+## 🔬 5. Testes Automatizados e End-to-End (E2E)
+
+Atendendo aos requisitos de qualidade e Clean Architecture, o projeto possui testes automatizados unitários, de integração e End-to-End.
+
+Para executar os testes locais (utilizando Pytest ou diretamente no Python):
+1. Testes Unitários e de Integração (Pytest):
+   ```bash
+   cd services/upload-service && pytest
+   cd ../ai-processor && pytest
+   ```
+2. Teste E2E (Simula o upload, polling e relatório final assíncrono via API Gateway):
+   ```bash
+   # Com a aplicação rodando via docker-compose:
+   python e2e_test.py
+   ```
+
+---
 *Hackathon Integrado FIAP (IADT + SOAT) 2026*

@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from src.infrastructure.db_adapter import DatabaseAdapter
-from src.application.report_use_case import SaveReportUseCase, GetReportUseCase
+from src.application.report_use_case import SaveReportUseCase, GetReportUseCase, GetAllReportsUseCase
 from shared.schemas import TechnicalReport
 from shared.telemetry import setup_telemetry_logger, TelemetryMiddleware
 from prometheus_client import make_asgi_app
@@ -14,6 +14,7 @@ logger = setup_telemetry_logger("report-service")
 db_adapter = DatabaseAdapter()
 save_use_case = SaveReportUseCase(db_adapter)
 get_use_case = GetReportUseCase(db_adapter)
+get_all_use_case = GetAllReportsUseCase(db_adapter)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,3 +49,8 @@ async def fetch_report(process_id: str):
     if not report:
         raise HTTPException(status_code=404, detail="Relatório não encontrado")
     return report
+
+@app.get("/internal/reports")
+async def fetch_all_reports():
+    """(Interno) Consultado pelo API Gateway para listar todos os relatórios do Log de Processamento"""
+    return await get_all_use_case.execute()

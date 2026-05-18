@@ -63,30 +63,41 @@ class GeminiAdapter:
             )
             
             ext_duration = time.perf_counter() - start_time
+            
+            # Store metadata temporarily in self if needed, or return a tuple (text, metadata).
+            token_in = getattr(response.usage_metadata, "prompt_token_count", 0) if hasattr(response, "usage_metadata") else 0
+            token_out = getattr(response.usage_metadata, "candidates_token_count", 0) if hasattr(response, "usage_metadata") else 0
+
             logger.info("Agente 1 concluiu extração.", extra={"extra_data": {"metric_type": "ai_inference", "agent_1_duration_seconds": round(ext_duration, 4)}})
-            return response.text
+            return {"text": response.text, "duration": ext_duration, "token_in": token_in, "token_out": token_out}
 
         except Exception as e:
             logger.error(f"Falha no Agente 1 (Extração de fatos): {str(e)}")
             raise e
 
-    async def generate_report_from_facts(self, facts: str, image_bytes: bytes, mime_type: str) -> TechnicalReport:
+    async def generate_report_from_facts(self, facts_info: dict, image_bytes: bytes, mime_type: str) -> TechnicalReport:
         start_time = time.perf_counter()
         try:
+            facts = facts_info['text']
             # Agente 2: Estruturador / Gerador de Relatório - Modelo apenas texto
             logger.info("Executando Agente 2: Gerando relatório estruturado JSON...")
             response = self._generate_content_with_fallback(
                 contents=[
                     f"Abaixo estão os fatos extraídos de um diagrama de arquitetura por outro sistema:\n\n{facts}\n\n"
-                    "Gere a saída JSON correspondente APENAS e EXATAMENTE com as raízes definidas no schema. Não envolva o JSON em propriedades como 'architecture_report' ou 'report_metadata'."
+                    "Gere a saída JSON correspondente APENAS e EXATAMENTE com as raízes definidas no schema. Não envolva o JSON em propriedades como 'architecture_report' ou 'report_metadata'. NUNCA preencha a propriedade 'observability', ela será preenchida pelo sistema."
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT,
                     response_mime_type="application/json",
+                    # No schema passed to allow the response to be unstructured JSON we parse safely. Or we can just use response_schema=TechnicalReport.
+                    # As TechnicalReport includes observability, we instruct it to NOT fill it above.
                     response_schema=TechnicalReport,
                     temperature=0.1
                 )
             )
+
+            agent2_token_in = getattr(response.usage_metadata, "prompt_token_count", 0) if hasattr(response, "usage_metadata") else 0
+            agent2_token_out = getattr(response.usage_metadata, "candidates_token_count", 0) if hasattr(response, "usage_metadata") else 0
             
             # Pre-parse para remover a alucinação de wrapper do Gemini (ex: {"report_metadata": {...}})
             response_text = response.text
@@ -103,7 +114,9 @@ class GeminiAdapter:
             report = TechnicalReport.model_validate_json(response_text)
             
             # 2. LLM-as-a-Judge (Juiz Autônomo comparando o output FINAL x Imagem Inicial)
-            is_hallucination = await self._judge_output(image_bytes, mime_type, report.model_dump_json())
+            # Nós também precisamos armazenar os tempos de guardrail, tokens de judge, etc, para métricas consolidadas
+            is_hallucination, judge_duration, judge_token_in, judge_token_out = await self._judge_output_metrics(image_bytes, mime_type, report.model_dump_json())
+            
             if is_hallucination:
                 logger.warning("Juiz Autônomo detectou possível alucinação arquitetural. Diminuindo confidence score.")
                 report.confidence_score = max(0.0, report.confidence_score - 0.4)
@@ -111,6 +124,19 @@ class GeminiAdapter:
                     raise SevereHallucinationException("Alucinação severa detectada pelo Juiz. Intervenção humana necessária.")
 
             duration = time.perf_counter() - start_time
+            
+            total_duration_ms = (duration + facts_info['duration'] + judge_duration) * 1000
+            total_token_in = facts_info['token_in'] + agent2_token_in + judge_token_in
+            total_token_out = facts_info['token_out'] + agent2_token_out + judge_token_out
+            
+            from shared.schemas import ObservabilityMetrics
+            report.observability = ObservabilityMetrics(
+                processing_time_ms=total_duration_ms,
+                llm_model=self.model_id,
+                token_in=total_token_in,
+                token_out=total_token_out
+            )
+
             logger.info("Agente 2 concluiu geracao de relatorio com sucesso.", extra={"extra_data": {"metric_type": "ai_inference", "ai_analysis_duration_seconds": round(duration, 4), "confidence_score": report.confidence_score, "pydantic_validation_success": 1}})
             return report
             
@@ -146,7 +172,13 @@ class GeminiAdapter:
             return False
 
     async def _judge_output(self, image_bytes: bytes, mime_type: str, report_json: str) -> bool:
-        """LLM-as-a-Judge para validar se o relatório é real ou alucinado."""
+        """Mantém fallback pra refatorações."""
+        res, _, _, _ = await self._judge_output_metrics(image_bytes, mime_type, report_json)
+        return res
+
+    async def _judge_output_metrics(self, image_bytes: bytes, mime_type: str, report_json: str) -> tuple[bool, float, int, int]:
+        """LLM-as-a-Judge para validar se o relatório é real ou alucinado com métricas."""
+        start_time = time.perf_counter()
         try:
             response = self._generate_content_with_fallback(
                 contents=[
@@ -155,9 +187,13 @@ class GeminiAdapter:
                 ],
                 config=types.GenerateContentConfig(temperature=0.0)
             )
-            return "HALLUCINATION" in response.text.strip().upper()
+            dur = time.perf_counter() - start_time
+            token_in = getattr(response.usage_metadata, "prompt_token_count", 0) if hasattr(response, "usage_metadata") else 0
+            token_out = getattr(response.usage_metadata, "candidates_token_count", 0) if hasattr(response, "usage_metadata") else 0
+            
+            return ("HALLUCINATION" in response.text.strip().upper(), dur, token_in, token_out)
         except:
-            return False
+            return (False, time.perf_counter() - start_time, 0, 0)
 
     def _get_fallback_report(self) -> TechnicalReport:
         """Retorna um relatório mockado para garantir que o sistema não pare (Resiliência)[cite: 1]."""
@@ -166,8 +202,14 @@ class GeminiAdapter:
                 {"name": "API Gateway", "category": "Network", "description": "Entry point for requests."},
                 {"name": "Azure SQL", "category": "Storage", "description": "Relational database."}
             ],
-            "architectural_risks": ["Single point of failure detected in Gateway."],
-            "recommendations": ["Implement multi-region redundancy."],
-            "confidence_score": 0.50
+            "architectural_risks": [{"risk": "Single point of failure detected in Gateway.", "severity": "Alta", "affected_components": ["API Gateway"]}],
+            "recommendations": [{"recommendation": "Implement multi-region redundancy.", "framework": "Well-Architected", "effort": "Alto"}],
+            "confidence_score": 0.50,
+            "observability": {
+                "processing_time_ms": 0.0,
+                "llm_model": "fallback-mock-model",
+                "token_in": 0,
+                "token_out": 0
+            }
         }
-        return TechnicalReport(**mock_data)
+        return TechnicalReport.model_validate(mock_data)

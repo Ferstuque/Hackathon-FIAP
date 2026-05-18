@@ -2,3 +2,29 @@
 .env
 .agent.md
 support/debug_*.md
+
+# Copilot / Specify Tools
+.specify/
+.instructions.md
+.prompt.md
+SKILL.md
+copilot-instructions.md
+AGENTS.md
+
+# Logs and Test Data
+*.log
+test_diagram.jpg
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+build/
+
+# IDE
+.vscode/

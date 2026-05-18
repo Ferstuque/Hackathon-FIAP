@@ -23,3 +23,10 @@ class GetReportUseCase:
         if data:
             return TechnicalReport(**data)
         return None
+
+class GetAllReportsUseCase:
+    def __init__(self, db: DatabaseAdapter):
+        self.db = db
+
+    async def execute(self) -> list[dict]:
+        return await self.db.get_all_reports()

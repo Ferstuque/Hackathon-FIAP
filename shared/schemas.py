@@ -31,6 +31,12 @@ class ActionableRecommendation(BaseModel):
     framework: str = Field(description="Framework de mercado associado (ex: Azure Well-Architected Framework, DORA, Zero-Trust)")
     effort: str = Field(description="Esforço Estimado para implementar: Alto, Médio, Baixo")
 
+class ObservabilityMetrics(BaseModel):
+    processing_time_ms: float = Field(description="Tempo de processamento (ms)")
+    llm_model: str = Field(description="Qual modelo foi usado")
+    token_in: int = Field(description="Quantidade de tokens de entrada")
+    token_out: int = Field(description="Quantidade de tokens de saída")
+
 class TechnicalReport(BaseModel):
     """O schema que o Gemini deve preencher obrigatoriamente."""
     model_config = ConfigDict(populate_by_name=True)
@@ -49,6 +55,9 @@ class TechnicalReport(BaseModel):
     )
     confidence_score: float = Field(
         ge=0, le=1, description="Grau de confiança da IA na análise do diagrama"
+    )
+    observability: ObservabilityMetrics | None = Field(
+        default=None, description="Métricas de tempo e tokens consumidos"
     )
 
 # --- SERVICE SCHEMAS ---

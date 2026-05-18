@@ -34,3 +34,10 @@ class DatabaseAdapter:
             if result:
                 return result.report_data
             return None
+
+    async def get_all_reports(self) -> list[dict]:
+        from sqlalchemy import select
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(ReportModel))
+            reports = result.scalars().all()
+            return [{"process_id": r.process_id, "report_data": r.report_data} for r in reports]

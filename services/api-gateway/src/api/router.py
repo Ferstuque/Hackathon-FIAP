@@ -43,3 +43,12 @@ async def get_final_report(analysis_id: str):
             raise HTTPException(status_code=404, detail="Relatório ainda não disponível ou ID inválido")
             
         return response.json()
+
+@api_router.get("/reports")
+async def get_all_reports():
+    """Recupera todos os relatórios processados para o Dashboard."""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{REPORT_SERVICE_URL}/internal/reports")
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail="Erro no serviço de relatórios")
+        return response.json()
