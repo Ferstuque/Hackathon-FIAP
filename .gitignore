@@ -31,3 +31,9 @@ build/
 
 .github/agents/
 .github/prompts/
+
+# Arquivos Soltos/Desnecessarios
+/package.json
+/package-lock.json
+structure.md
+specs/
