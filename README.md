@@ -5,6 +5,10 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-v0.110-green)
 ![Gemini](https://img.shields.io/badge/AI-Gemini_3.1_Pro-orange)
 
+---
+### 📺 [Vídeo Demonstrativo](https://youtu.be/iRFrgzph0d8)
+---
+
 ## 📌 1. O Problema
 Empresas que operam sistemas distribuídos possuem dezenas de diagramas de arquitetura, muitas vezes analisados visualmente e manualmente em busca de vulnerabilidades, pontos únicos de falha e boas práticas. Esse processo **não escala**, demanda muito tempo de especialistas caros (Arquitetos/Staff Engineers) e é propenso a falhas humanas. 
 
